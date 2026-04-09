@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- SheetJS for Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <!-- jsPDF + autoTable for PDF -->
+    <!-- jsPDF and autoTable for PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <!-- Chart.js -->
+    <!-- Chart.js for Dashboard -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial; margin: 20px; background: #f4f6f9; }
@@ -45,6 +45,7 @@
     <button onclick="exportFullExcel()">Export Excel</button>
     <button onclick="exportFullPDF()">Export PDF</button>
 
+    <!-- NAVIGATION -->
     <div style="text-align:center; margin-top:10px;">
         <button onclick="showSection('dashboard')">Dashboard</button>
         <button onclick="showSection('inventory')">Inventory</button>
@@ -196,8 +197,8 @@
                 <td>${i.item}</td>
                 <td>${i.qty}</td>
                 <td>${i.remaining}</td>
-                <td>₱${i.unitPrice.toLocaleString()}</td>
-                <td>₱${total.toLocaleString()}</td>
+                <td>${i.unitPrice.toLocaleString()}</td>
+                <td>${total.toLocaleString()}</td>
                 <td>${i.officer}</td>
                 <td>${i.location}</td>
                 <td>${i.condition}</td>
@@ -221,7 +222,7 @@
     }
 
     function renderTransfers(){ let t=""; transfers.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.from}</td><td>${i.to}</td></tr>`; }); document.querySelector("#transferTable tbody").innerHTML=t; }
-    function renderRepairs(){ let t=""; repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>₱${parseFloat(i.cost).toLocaleString()}</td></tr>`; }); document.querySelector("#repairTable tbody").innerHTML=t; }
+    function renderRepairs(){ let t=""; repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>${parseFloat(i.cost).toLocaleString()}</td></tr>`; }); document.querySelector("#repairTable tbody").innerHTML=t; }
     function renderDisposals(){ let t=""; disposals.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.method}</td></tr>`; }); document.querySelector("#disposalTable tbody").innerHTML=t; }
 
     // ===== FORM SUBMISSION =====
@@ -257,71 +258,36 @@
 
     // ===== EXPORT =====
     function exportFullExcel(){
-        const wb = XLSX.utils.book_new();
-        const inventoryData = inventory.map(i => ({
-            Property: i.property || '',
-            Item: i.item || '',
-            Qty: i.qty || 0,
-            Remaining: i.remaining || 0,
-            'Unit Price': i.unitPrice || 0,
-            'Total Value': (i.qty || 0)*(i.unitPrice || 0),
-            Officer: i.officer || '',
-            Location: i.location || '',
-            Condition: i.condition || ''
-        }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inventoryData), "Inventory");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(issuance), "Issuance");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transfers), "Transfers");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(repairs), "Repairs");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(disposals), "Disposals");
-        XLSX.writeFile(wb, "PIMIS_Full_Report.xlsx");
+        const wb=XLSX.utils.book_new();
+        const inventoryData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(inventoryData),"Inventory");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(issuance),"Issuance");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(transfers),"Transfers");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(repairs),"Repairs");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(disposals),"Disposals");
+        XLSX.writeFile(wb,"PIMIS_Full_Report.xlsx");
     }
 
     function exportFullPDF(){
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        let startY = 20;
-        doc.setFontSize(14);
-        doc.text("PIMIS Full Report", 10, startY);
-        startY += 10;
+        const { jsPDF }=window.jspdf;
+        const doc=new jsPDF();
+        let startY=20;
+        doc.setFontSize(14); doc.text("PIMIS Full Report",10,startY); startY+=10;
 
-        function addTable(title, data, headers){
-            doc.setFontSize(12);
-            doc.text(title, 10, startY);
-            startY += 5;
-
-            if(!data.length){ doc.text("No data available", 10, startY); startY += 10; return; }
-
-            const rows = data.map(obj => headers.map(h => {
-                if(['Unit Price','Total Value','Cost'].includes(h)){
-                    return '₱'+(obj[h] ? parseFloat(obj[h]).toLocaleString() : '0');
-                }
-                return obj[h] || '';
-            }));
-
-            doc.autoTable({
-                head: [headers],
-                body: rows,
-                startY,
-                margin: { left: 10, right: 10 },
-                styles: { fontSize: 10, cellPadding: 2 },
-                theme: 'grid',
-                headStyles: { fillColor: [0,123,255], textColor: 255 }
-            });
-            startY = doc.lastAutoTable.finalY + 10;
+        function addTable(title,data,headers){
+            doc.setFontSize(12); doc.text(title,10,startY); startY+=5;
+            if(!data.length){ doc.text("No data available",10,startY); startY+=10; return; }
+            const rows=data.map(obj=>headers.map(h=>['Unit Price','Total Value','Cost'].includes(h)? '₱'+(obj[h]?parseFloat(obj[h]).toLocaleString():0):obj[h]||'' ));
+            doc.autoTable({ head:[headers], body:rows, startY, margin:{left:10,right:10}, styles:{fontSize:10,cellPadding:2}, theme:'grid', headStyles:{fillColor:[0,123,255],textColor:255} });
+            startY=doc.lastAutoTable.finalY+10;
         }
 
-        const invData = inventory.map(i => ({
-            Property: i.property, Item: i.item, Qty: i.qty, Remaining: i.remaining,
-            'Unit Price': i.unitPrice, 'Total Value': i.qty*i.unitPrice,
-            Officer: i.officer, Location: i.location, Condition: i.condition
-        }));
-
-        addTable("Inventory", invData, ["Property","Item","Qty","Remaining","Unit Price","Total Value","Officer","Location","Condition"]);
-        addTable("Issuance", issuance, ["property","ics","par","to"]);
-        addTable("Transfers", transfers, ["property","from","to"]);
-        addTable("Repairs", repairs, ["property","issue","cost"]);
-        addTable("Disposals", disposals, ["property","method"]);
+        const invData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
+        addTable("Inventory",invData,["Property","Item","Qty","Remaining","Unit Price","Total Value","Officer","Location","Condition"]);
+        addTable("Issuance",issuance,["property","ics","par","to"]);
+        addTable("Transfers",transfers,["property","from","to"]);
+        addTable("Repairs",repairs,["property","issue","cost"]);
+        addTable("Disposals",disposals,["property","method"]);
 
         doc.save("PIMIS_Full_Report.pdf");
     }
@@ -348,11 +314,12 @@
         if(window.pieChart) window.pieChart.destroy();
 
         window.barChart=new Chart(ctxBar,{ type:'bar', data:{ labels, datasets:[{ label:'Remaining Qty', data:remainingData, backgroundColor:'#007bff' }] }, options:{ responsive:true } });
-        window.pieChart=new Chart(ctxPie,{ type:'pie', data:{ labels:Object.keys(conditions), datasets:[{ data:Object.values(conditions), backgroundColor:['#007bff','#28a745','#dc3545','#ffc107'] }] }, options:{ responsive:true } });
+        window.pieChart=new Chart(ctxPie,{ type:'pie', data:{ labels:Object.keys(conditions), datasets:[{ data:Object.values(conditions), backgroundColor:['#007bff','#28a745','#ffc107','#dc3545'] }] }, options:{ responsive:true } });
     }
 
     // ===== INITIAL RENDER =====
-    renderInventory(); renderIssuance(); renderTransfers(); renderRepairs(); renderDisposals();
+    renderInventory(); renderIssuance(); renderTransfers(); renderRepairs(); renderDisposals(); updateDashboard();
 </script>
+
 </body>
 </html>
