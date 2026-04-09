@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>PIMIS v5 - Inventory with Dashboard & Printable Forms</title>
+    <title>PIMIS v4 - Inventory with Dashboard</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- SheetJS for Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <!-- jsPDF and autoTable for PDF -->
+    <!-- jsPDF + autoTable for PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <!-- Chart.js for Dashboard -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial; margin: 20px; background: #f4f6f9; }
@@ -45,7 +45,6 @@
     <button onclick="exportFullExcel()">Export Excel</button>
     <button onclick="exportFullPDF()">Export PDF</button>
 
-    <!-- NAVIGATION -->
     <div style="text-align:center; margin-top:10px;">
         <button onclick="showSection('dashboard')">Dashboard</button>
         <button onclick="showSection('inventory')">Inventory</button>
@@ -210,79 +209,22 @@
 
     function deleteItem(index){ inventory.splice(index,1); localStorage.setItem('inventory',JSON.stringify(inventory)); renderInventory(); updateDashboard(); }
 
-    // ===== ISSUANCE WITH PRINT =====
     function renderIssuance(){
         let t="";
         issuance.forEach((i,index)=>{
             t+=`<tr>
-                <td>${i.property}</td>
-                <td>${i.ics}</td>
-                <td>${i.par}</td>
-                <td>${i.to}</td>
-                <td><button onclick="printPARICS(${index})">Print Form</button></td>
+                <td>${i.property}</td><td>${i.ics}</td><td>${i.par}</td><td>${i.to}</td>
+                <td><button onclick="printPAR(${index})">Print</button></td>
             </tr>`;
         });
         document.querySelector("#issuanceTable tbody").innerHTML=t;
-        updateDashboard();
     }
 
-    function printPARICS(index){
-        const issuanceEntry = issuance[index];
-        const item = inventory.find(inv => inv.property === issuanceEntry.property);
-        const unitPrice = item ? item.unitPrice : 0;
-        const totalValue = item ? item.qty * item.unitPrice : 0;
+    function renderTransfers(){ let t=""; transfers.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.from}</td><td>${i.to}</td></tr>`; }); document.querySelector("#transferTable tbody").innerHTML=t; }
+    function renderRepairs(){ let t=""; repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>₱${parseFloat(i.cost).toLocaleString()}</td></tr>`; }); document.querySelector("#repairTable tbody").innerHTML=t; }
+    function renderDisposals(){ let t=""; disposals.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.method}</td></tr>`; }); document.querySelector("#disposalTable tbody").innerHTML=t; }
 
-        const printWindow = window.open("", "_blank");
-        printWindow.document.write(`
-            <html>
-            <head>
-            <title>PAR/ICS Form</title>
-            <style>
-                body{font-family:Arial; padding:20px;}
-                h2{text-align:center;}
-                table{width:100%; border-collapse: collapse; margin-top:10px;}
-                th,td{border:1px solid #000; padding:8px; text-align:left;}
-                th{background:#007bff; color:white;}
-            </style>
-            </head>
-            <body>
-            <h2>Property Issuance Form (PAR/ICS)</h2>
-            <table>
-                <tr><th>Property</th><td>${issuanceEntry.property}</td></tr>
-                <tr><th>ICS</th><td>${issuanceEntry.ics}</td></tr>
-                <tr><th>PAR</th><td>${issuanceEntry.par}</td></tr>
-                <tr><th>Issued To</th><td>${issuanceEntry.to}</td></tr>
-                <tr><th>Unit Price</th><td>₱${unitPrice.toLocaleString()}</td></tr>
-                <tr><th>Total Value</th><td>₱${totalValue.toLocaleString()}</td></tr>
-            </table>
-            <p style="margin-top:20px;">Prepared by: ___________________</p>
-            <p>Date: ___________________</p>
-            <script>window.print();</script>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-    }
-
-    function renderTransfers(){ 
-        let t=""; 
-        transfers.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.from}</td><td>${i.to}</td></tr>`; }); 
-        document.querySelector("#transferTable tbody").innerHTML=t; 
-    }
-
-    function renderRepairs(){ 
-        let t=""; 
-        repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>₱${parseFloat(i.cost).toLocaleString()}</td></tr>`; }); 
-        document.querySelector("#repairTable tbody").innerHTML=t; 
-    }
-
-    function renderDisposals(){ 
-        let t=""; 
-        disposals.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.method}</td></tr>`; }); 
-        document.querySelector("#disposalTable tbody").innerHTML=t; 
-    }
-
-    // ===== FORM SUBMISSIONS =====
+    // ===== FORM SUBMISSION =====
     document.getElementById("inventoryForm").addEventListener("submit", function(e){
         e.preventDefault();
         const item={ property:propertyNo.value, item:itemName.value, qty:parseInt(qty.value), unitPrice:parseFloat(unitPrice.value), officer:officer.value, location:itemLocation.value, condition:condition.value };
@@ -315,63 +257,102 @@
 
     // ===== EXPORT =====
     function exportFullExcel(){
-        const wb=XLSX.utils.book_new();
-        const inventoryData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(inventoryData),"Inventory");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(issuance),"Issuance");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(transfers),"Transfers");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(repairs),"Repairs");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(disposals),"Disposals");
-        XLSX.writeFile(wb,"PIMIS_Full_Report.xlsx");
+        const wb = XLSX.utils.book_new();
+        const inventoryData = inventory.map(i => ({
+            Property: i.property || '',
+            Item: i.item || '',
+            Qty: i.qty || 0,
+            Remaining: i.remaining || 0,
+            'Unit Price': i.unitPrice || 0,
+            'Total Value': (i.qty || 0)*(i.unitPrice || 0),
+            Officer: i.officer || '',
+            Location: i.location || '',
+            Condition: i.condition || ''
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inventoryData), "Inventory");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(issuance), "Issuance");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transfers), "Transfers");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(repairs), "Repairs");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(disposals), "Disposals");
+        XLSX.writeFile(wb, "PIMIS_Full_Report.xlsx");
     }
 
     function exportFullPDF(){
-        const { jsPDF }=window.jspdf;
-        const doc=new jsPDF();
-        let startY=20;
-        doc.setFontSize(14); doc.text("PIMIS Full Report",10,startY); startY+=10;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        let startY = 20;
+        doc.setFontSize(14);
+        doc.text("PIMIS Full Report", 10, startY);
+        startY += 10;
 
-        function addTable(title,data,headers){
-            doc.setFontSize(12); doc.text(title,10,startY); startY+=5;
-            if(!data.length){ doc.text("No data available",10,startY); startY+=10; return; }
-            const rows=data.map(obj=>headers.map(h=>['Unit Price','Total Value','Cost'].includes(h)? '₱'+(obj[h]?parseFloat(obj[h]).toLocaleString():0):obj[h]||'' ));
-            doc.autoTable({ head:[headers], body:rows, startY, margin:{left:10,right:10}, styles:{fontSize:10,cellPadding:2}, theme:'grid', headStyles:{fillColor:[0,123,255],textColor:255} });
-            startY=doc.lastAutoTable.finalY+10;
+        function addTable(title, data, headers){
+            doc.setFontSize(12);
+            doc.text(title, 10, startY);
+            startY += 5;
+
+            if(!data.length){ doc.text("No data available", 10, startY); startY += 10; return; }
+
+            const rows = data.map(obj => headers.map(h => {
+                if(['Unit Price','Total Value','Cost'].includes(h)){
+                    return '₱'+(obj[h] ? parseFloat(obj[h]).toLocaleString() : '0');
+                }
+                return obj[h] || '';
+            }));
+
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY,
+                margin: { left: 10, right: 10 },
+                styles: { fontSize: 10, cellPadding: 2 },
+                theme: 'grid',
+                headStyles: { fillColor: [0,123,255], textColor: 255 }
+            });
+            startY = doc.lastAutoTable.finalY + 10;
         }
 
-        const invData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
-        addTable("Inventory",invData,["Property","Item","Qty","Remaining","Unit Price","Total Value","Officer","Location","Condition"]);
-        addTable("Issuance",issuance,["property","ics","par","to"]);
-        addTable("Transfers",transfers,["property","from","to"]);
-        addTable("Repairs",repairs,["property","issue","cost"]);
-        addTable("Disposals",disposals,["property","method"]);
+        const invData = inventory.map(i => ({
+            Property: i.property, Item: i.item, Qty: i.qty, Remaining: i.remaining,
+            'Unit Price': i.unitPrice, 'Total Value': i.qty*i.unitPrice,
+            Officer: i.officer, Location: i.location, Condition: i.condition
+        }));
+
+        addTable("Inventory", invData, ["Property","Item","Qty","Remaining","Unit Price","Total Value","Officer","Location","Condition"]);
+        addTable("Issuance", issuance, ["property","ics","par","to"]);
+        addTable("Transfers", transfers, ["property","from","to"]);
+        addTable("Repairs", repairs, ["property","issue","cost"]);
+        addTable("Disposals", disposals, ["property","method"]);
 
         doc.save("PIMIS_Full_Report.pdf");
     }
 
-    // ===== DASHBOARD =====
-    function updateDashboard(){
-        const ctxBar=document.getElementById("barChart").getContext('2d');
-        const ctxPie=document.getElementById("pieChart").getContext('2d');
-        const labels=inventory.map(i=>i.item);
-        const dataVals=inventory.map(i=>i.qty);
-        if(window.barChart) window.barChart.destroy();
-        window.barChart=new Chart(ctxBar,{ type:'bar', data:{labels, datasets:[{label:'Qty', data:dataVals, backgroundColor:'rgba(0,123,255,0.7)'}] }, options:{ responsive:true, plugins:{legend:{display:false}} } });
-
-        const pieLabels=['Issued','Transferred','Disposed','Remaining'];
-        const pieData=[
-            issuance.length,
-            transfers.length,
-            disposals.length,
-            inventory.reduce((a,i)=>a+i.remaining,0)
-        ];
-        if(window.pieChart) window.pieChart.destroy();
-        window.pieChart=new Chart(ctxPie,{ type:'pie', data:{labels:pieLabels,datasets:[{data:pieData, backgroundColor:['#007bff','#28a745','#dc3545','#ffc107']}] }, options:{ responsive:true } });
+    // ===== PRINT PAR =====
+    function printPAR(index){
+        const i=issuance[index];
+        const w=window.open('','Print','width=600,height=400');
+        w.document.write(`<h2>Property Acknowledgment Receipt (PAR)</h2><p>Property: ${i.property}</p><p>PAR: ${i.par}</p><p>Issued To: ${i.to}</p>`);
+        w.print();
     }
 
-    // INITIAL RENDER
+    // ===== DASHBOARD =====
+    function updateDashboard(){
+        updateRemainingInventory();
+        const ctxBar=document.getElementById('barChart').getContext('2d');
+        const ctxPie=document.getElementById('pieChart').getContext('2d');
+        const labels=inventory.map(i=>i.item);
+        const remainingData=inventory.map(i=>i.remaining);
+        const conditions={};
+        inventory.forEach(i=>conditions[i.condition]=(conditions[i.condition]||0)+1);
+
+        if(window.barChart) window.barChart.destroy();
+        if(window.pieChart) window.pieChart.destroy();
+
+        window.barChart=new Chart(ctxBar,{ type:'bar', data:{ labels, datasets:[{ label:'Remaining Qty', data:remainingData, backgroundColor:'#007bff' }] }, options:{ responsive:true } });
+        window.pieChart=new Chart(ctxPie,{ type:'pie', data:{ labels:Object.keys(conditions), datasets:[{ data:Object.values(conditions), backgroundColor:['#007bff','#28a745','#dc3545','#ffc107'] }] }, options:{ responsive:true } });
+    }
+
+    // ===== INITIAL RENDER =====
     renderInventory(); renderIssuance(); renderTransfers(); renderRepairs(); renderDisposals();
 </script>
-
 </body>
 </html>
