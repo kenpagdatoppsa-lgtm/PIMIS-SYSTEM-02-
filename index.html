@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>PIMIS v4 - Inventory with Dashboard</title>
+    <title>PIMIS v4 - Inventory System</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- SheetJS for Excel -->
@@ -9,7 +9,7 @@
     <!-- jsPDF and autoTable for PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <!-- Chart.js for Dashboard -->
+    <!-- Chart.js for dashboard -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial; margin: 20px; background: #f4f6f9; }
@@ -21,8 +21,10 @@
         button { margin: 5px; padding: 6px 12px; cursor: pointer; }
         input, select { padding: 5px; margin: 2px; }
         #login { max-width: 300px; margin: auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
-        #dashboard { margin-top: 30px; text-align:center; }
-        canvas { max-width: 600px; margin: 10px auto; }
+        .dashboard { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 20px; }
+        .card { background: white; padding: 15px; border-radius: 8px; width: 150px; text-align: center; margin:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+        canvas { max-width: 100%; margin-top: 20px; }
+        .zero-remaining { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -45,9 +47,22 @@
     <button onclick="exportFullExcel()">Export Excel</button>
     <button onclick="exportFullPDF()">Export PDF</button>
 
+    <!-- DASHBOARD -->
+    <div class="dashboard">
+        <div class="card"><h3 id="totalInventory">0</h3><p>Total Inventory</p></div>
+        <div class="card"><h3 id="totalRemaining">0</h3><p>Total Remaining</p></div>
+        <div class="card"><h3 id="totalIssued">0</h3><p>Total Issued</p></div>
+        <div class="card"><h3 id="totalTransfers">0</h3><p>Total Transfers</p></div>
+        <div class="card"><h3 id="totalRepairs">0</h3><p>Total Repairs</p></div>
+        <div class="card"><h3 id="totalDisposals">0</h3><p>Total Disposals</p></div>
+        <div class="card"><h3 id="totalValue">0</h3><p>Total Value</p></div>
+    </div>
+
+    <canvas id="barChart"></canvas>
+    <canvas id="pieChart"></canvas>
+
     <!-- NAVIGATION -->
     <div style="text-align:center; margin-top:10px;">
-        <button onclick="showSection('dashboard')">Dashboard</button>
         <button onclick="showSection('inventory')">Inventory</button>
         <button onclick="showSection('issuance')">Issuance</button>
         <button onclick="showSection('transfers')">Transfers</button>
@@ -55,21 +70,14 @@
         <button onclick="showSection('disposals')">Disposals</button>
     </div>
 
-    <!-- DASHBOARD -->
-    <div id="dashboard" class="container">
-        <h2>Dashboard</h2>
-        <canvas id="barChart"></canvas>
-        <canvas id="pieChart"></canvas>
-    </div>
-
-    <!-- INVENTORY -->
+    <!-- SECTIONS -->
     <div id="inventory" class="container">
         <h2>Inventory</h2>
         <form id="inventoryForm">
             <input placeholder="Property No" id="propertyNo" required>
             <input placeholder="Item Name" id="itemName" required>
-            <input placeholder="Quantity" id="qty" type="number" required>
-            <input placeholder="Unit Price" id="unitPrice" type="number" required>
+            <input placeholder="Quantity" id="qty" type="number" min="1" required>
+            <input placeholder="Unit Price" id="value" type="number" min="0" required>
             <input placeholder="Officer" id="officer" required>
             <input placeholder="Location" id="itemLocation" required>
             <input placeholder="Condition" id="condition" required>
@@ -79,15 +87,13 @@
             <thead>
                 <tr>
                     <th>Property</th><th>Item</th><th>Qty</th><th>Remaining</th>
-                    <th>Unit Price</th><th>Total Value</th>
-                    <th>Officer</th><th>Location</th><th>Condition</th><th>Action</th>
+                    <th>Unit Price</th><th>Total Value</th><th>Officer</th><th>Location</th><th>Condition</th><th>Action</th>
                 </tr>
             </thead>
             <tbody></tbody>
         </table>
     </div>
 
-    <!-- ISSUANCE -->
     <div id="issuance" class="container">
         <h2>Issuance</h2>
         <form id="issuanceForm">
@@ -98,12 +104,16 @@
             <button type="submit">Add Issuance</button>
         </form>
         <table id="issuanceTable">
-            <thead><tr><th>Property</th><th>ICS</th><th>PAR</th><th>Issued To</th><th>Print</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Property</th><th>ICS</th><th>PAR</th><th>Issued To</th>
+                    <th>Print ICS</th><th>Print PAR</th><th>Action</th>
+                </tr>
+            </thead>
             <tbody></tbody>
         </table>
     </div>
 
-    <!-- TRANSFERS -->
     <div id="transfers" class="container">
         <h2>Transfers</h2>
         <form id="transferForm">
@@ -113,18 +123,17 @@
             <button type="submit">Add Transfer</button>
         </form>
         <table id="transferTable">
-            <thead><tr><th>Property</th><th>From</th><th>To</th></tr></thead>
+            <thead><tr><th>Property</th><th>From</th><th>To</th><th>Action</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
 
-    <!-- REPAIRS -->
     <div id="repairs" class="container">
         <h2>Repairs</h2>
         <form id="repairForm">
             <input placeholder="Property" id="repairProperty" required>
             <input placeholder="Issue" id="issue" required>
-            <input placeholder="Cost" id="cost" type="number" required>
+            <input placeholder="Cost" id="cost" type="number" min="0" required>
             <button type="submit">Add Repair</button>
         </form>
         <table id="repairTable">
@@ -133,7 +142,6 @@
         </table>
     </div>
 
-    <!-- DISPOSALS -->
     <div id="disposals" class="container">
         <h2>Disposals</h2>
         <form id="disposalForm">
@@ -149,177 +157,206 @@
 </div>
 
 <script>
-    // ===== LOGIN =====
-    const users = [{username:"Admin",password:"Admin123!"},{username:"Officer",password:"Officer123!"}];
-    const loginForm=document.getElementById("loginForm");
-    const loginError=document.getElementById("loginError");
-    const loginDiv=document.getElementById("login");
-    const mainContent=document.getElementById("mainContent");
+/* ===== LOGIN ===== */
+const users=[{username:"Admin",password:"Admin123!"},{username:"Officer",password:"Officer123!"}];
+const loginForm=document.getElementById("loginForm");
+const loginError=document.getElementById("loginError");
+const loginDiv=document.getElementById("login");
+const mainContent=document.getElementById("mainContent");
 
-    loginForm.addEventListener("submit", function(e){
-        e.preventDefault();
-        const username=document.getElementById("username").value;
-        const password=document.getElementById("password").value;
-        const user=users.find(u=>u.username===username && u.password===password);
-        if(user){ loginDiv.style.display="none"; mainContent.style.display="block"; showSection('dashboard'); updateDashboard(); localStorage.setItem("loggedIn","true"); }
-        else { loginError.textContent="Invalid username or password!"; }
+loginForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    const usernameInput=document.getElementById("username").value.trim().toLowerCase();
+    const passwordInput=document.getElementById("password").value;
+    const user=users.find(u=>u.username.toLowerCase()===usernameInput && u.password===passwordInput);
+    if(user){
+        loginDiv.style.display="none";
+        mainContent.style.display="block";
+        showSection('inventory');
+        localStorage.setItem("loggedIn","true");
+        updateDashboard();
+        loginError.textContent="";
+    } else loginError.textContent="Invalid username or password!";
+});
+
+if(localStorage.getItem("loggedIn")==="true"){ 
+    loginDiv.style.display="none"; 
+    mainContent.style.display="block"; 
+    showSection('inventory'); 
+    updateDashboard(); 
+}
+
+function logout(){ localStorage.removeItem("loggedIn"); location.reload(); }
+
+/* ===== NAVIGATION ===== */
+function showSection(section){ document.querySelectorAll('.container').forEach(d=>d.style.display='none'); document.getElementById(section).style.display='block'; }
+
+/* ===== LOCAL STORAGE ===== */
+let inventory=JSON.parse(localStorage.getItem('inventory'))||[];
+let issuance=JSON.parse(localStorage.getItem('issuance'))||[];
+let transfers=JSON.parse(localStorage.getItem('transfers'))||[];
+let repairs=JSON.parse(localStorage.getItem('repairs'))||[];
+let disposals=JSON.parse(localStorage.getItem('disposals'))||[];
+
+function formatPeso(num){ return '₱'+parseFloat(num||0).toLocaleString('en-PH',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function updateRemainingInventory(){
+    inventory.forEach(item=>{
+        const issuedCount=issuance.filter(i=>i.property===item.property).length;
+        const transferredCount=transfers.filter(t=>t.property===item.property).length;
+        const disposedCount=disposals.filter(d=>d.property===item.property).length;
+        item.remaining=item.qty-issuedCount-transferredCount-disposedCount;
+        if(item.remaining<0)item.remaining=0;
     });
+}
 
-    if(localStorage.getItem("loggedIn")==="true"){ loginDiv.style.display="none"; mainContent.style.display="block"; showSection('dashboard'); updateDashboard(); }
+/* ===== RENDER ===== */
+function renderInventory(){ 
+    updateRemainingInventory();
+    let t=""; 
+    inventory.forEach((i,index)=>{ 
+        const total=i.remaining*i.value; 
+        t+=`<tr><td>${i.property}</td><td>${i.item}</td><td>${i.qty}</td><td class='${i.remaining===0?'zero-remaining':''}'>${i.remaining}</td><td>${formatPeso(i.value)}</td><td>${formatPeso(total)}</td><td>${i.officer}</td><td>${i.location}</td><td>${i.condition}</td><td><button onclick='deleteItem(${index})'>Delete</button></td></tr>`; 
+    }); 
+    document.querySelector("#inventoryTable tbody").innerHTML=t; 
+    updateDashboard();
+}
 
-    function logout(){ localStorage.removeItem("loggedIn"); location.reload(); }
-    function showSection(section){ document.querySelectorAll('.container').forEach(div=>div.style.display='none'); document.getElementById(section).style.display='block'; if(section==='dashboard') updateDashboard(); }
+function renderIssuance(){ 
+    let t=""; 
+    issuance.forEach((i,index)=>{ 
+        t+=`<tr><td>${i.property}</td><td>${i.ics}</td><td>${i.par}</td><td>${i.to}</td><td><button onclick='printICS(${index})'>Print ICS</button></td><td><button onclick='printPAR(${index})'>Print PAR</button></td><td><button onclick='deleteIssuance(${index})'>Delete</button></td></tr>`; 
+    }); 
+    document.querySelector("#issuanceTable tbody").innerHTML=t; 
+}
 
-    // ===== LOCAL STORAGE =====
-    let inventory=JSON.parse(localStorage.getItem('inventory'))||[];
-    let issuance=JSON.parse(localStorage.getItem('issuance'))||[];
-    let transfers=JSON.parse(localStorage.getItem('transfers'))||[];
-    let repairs=JSON.parse(localStorage.getItem('repairs'))||[];
-    let disposals=JSON.parse(localStorage.getItem('disposals'))||[];
+function renderTransfers(){ let t=""; transfers.forEach((i,index)=>{ t+=`<tr><td>${i.property}</td><td>${i.from}</td><td>${i.to}</td><td><button onclick='deleteTransfer(${index})'>Delete</button></td></tr>`; }); document.querySelector("#transferTable tbody").innerHTML=t; }
 
-    function updateRemainingInventory() {
-        inventory.forEach(item=>{
-            const issuedCount=issuance.filter(i=>i.property===item.property).length;
-            const transferredCount=transfers.filter(t=>t.property===item.property).length;
-            const disposedCount=disposals.filter(d=>d.property===item.property).length;
-            item.remaining=item.qty - issuedCount - transferredCount - disposedCount;
-            if(item.remaining<0) item.remaining=0;
-        });
+function renderRepairs(){ let t=""; repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>${formatPeso(i.cost)}</td></tr>`; }); document.querySelector("#repairTable tbody").innerHTML=t; }
+
+function renderDisposals(){ let t=""; disposals.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.method}</td></tr>`; }); document.querySelector("#disposalTable tbody").innerHTML=t; }
+
+/* ===== DELETE ===== */
+function deleteItem(index){ inventory.splice(index,1); localStorage.setItem('inventory',JSON.stringify(inventory)); renderInventory(); }
+function deleteIssuance(index){ issuance.splice(index,1); localStorage.setItem('issuance',JSON.stringify(issuance)); renderIssuance(); renderInventory(); }
+function deleteTransfer(index){ transfers.splice(index,1); localStorage.setItem('transfers',JSON.stringify(transfers)); renderTransfers(); renderInventory(); }
+
+/* ===== FORMS ===== */
+document.getElementById("inventoryForm").addEventListener("submit", function(e){ 
+    e.preventDefault(); 
+    const i={ property:propertyNo.value, item:itemName.value, qty:parseInt(qty.value), value:parseFloat(value.value), officer:officer.value, location:itemLocation.value, condition:condition.value, remaining:parseInt(qty.value) }; 
+    inventory.push(i); 
+    localStorage.setItem('inventory',JSON.stringify(inventory)); 
+    renderInventory(); 
+    this.reset(); 
+});
+
+document.getElementById("issuanceForm").addEventListener("submit", function(e){ 
+    e.preventDefault(); 
+    const prop=issueProperty.value; 
+    const item=inventory.find(x=>x.property===prop); 
+    if(!item){ alert("Property not found."); return; } 
+    if(item.remaining<=0){ alert("Cannot issue. No remaining items."); return; } 
+    issuance.push({ property:prop, ics:ics.value, par:par.value, to:issuedTo.value }); 
+    localStorage.setItem('issuance',JSON.stringify(issuance)); 
+    renderIssuance(); renderInventory(); 
+    this.reset(); 
+});
+
+document.getElementById("transferForm").addEventListener("submit", function(e){ 
+    e.preventDefault(); 
+    const prop=transferProperty.value; 
+    const item=inventory.find(x=>x.property===prop); 
+    if(!item){ alert("Property not found."); return; } 
+    if(item.remaining<=0){ alert("Cannot transfer. No remaining items."); return; } 
+    transfers.push({ property:prop, from:fromOffice.value, to:toOffice.value }); 
+    localStorage.setItem('transfers',JSON.stringify(transfers)); 
+    renderTransfers(); renderInventory(); 
+    this.reset(); 
+});
+
+document.getElementById("repairForm").addEventListener("submit", function(e){ 
+    e.preventDefault(); 
+    repairs.push({ property:repairProperty.value, issue:issue.value, cost:parseFloat(cost.value) }); 
+    localStorage.setItem('repairs',JSON.stringify(repairs)); 
+    renderRepairs(); 
+    this.reset(); 
+});
+
+document.getElementById("disposalForm").addEventListener("submit", function(e){ 
+    e.preventDefault(); 
+    const prop=disposeProperty.value; 
+    const item=inventory.find(x=>x.property===prop); 
+    if(!item){ alert("Property not found."); return; } 
+    if(item.remaining<=0){ alert("Cannot dispose. No remaining items."); return; } 
+    disposals.push({ property:prop, method:method.value }); 
+    localStorage.setItem('disposals',JSON.stringify(disposals)); 
+    renderDisposals(); renderInventory(); 
+    this.reset(); 
+});
+
+/* ===== PRINT ICS/PAR ===== */
+function printICS(index){ const i=issuance[index]; alert(`Printing ICS for ${i.property}, ICS: ${i.ics}`); }
+function printPAR(index){ const i=issuance[index]; alert(`Printing PAR for ${i.property}, PAR: ${i.par}`); }
+
+/* ===== DASHBOARD ===== */
+function updateDashboard(){
+    const totalInventory=inventory.length;
+    const totalRemaining=inventory.reduce((a,b)=>a+(b.remaining||0),0);
+    const totalIssued=issuance.length;
+    const totalTransfers=transfers.length;
+    const totalRepairs=repairs.length;
+    const totalDisposals=disposals.length;
+    const totalValue=inventory.reduce((a,b)=>a+(b.remaining*(b.value||0)),0);
+
+    document.getElementById('totalInventory').textContent=totalInventory;
+    document.getElementById('totalRemaining').textContent=totalRemaining;
+    document.getElementById('totalIssued').textContent=totalIssued;
+    document.getElementById('totalTransfers').textContent=totalTransfers;
+    document.getElementById('totalRepairs').textContent=totalRepairs;
+    document.getElementById('totalDisposals').textContent=totalDisposals;
+    document.getElementById('totalValue').textContent=formatPeso(totalValue);
+
+    const ctxBar=document.getElementById('barChart').getContext('2d');
+    if(window.barChart) window.barChart.destroy();
+    window.barChart=new Chart(ctxBar,{type:'bar',data:{labels:['Inventory','Remaining','Issued','Transfers','Repairs','Disposals'],datasets:[{label:'Counts',data:[totalInventory,totalRemaining,totalIssued,totalTransfers,totalRepairs,totalDisposals],backgroundColor:'#007bff'}]}});
+
+    const ctxPie=document.getElementById('pieChart').getContext('2d');
+    if(window.pieChart) window.pieChart.destroy();
+    window.pieChart=new Chart(ctxPie,{type:'pie',data:{labels:['Remaining','Issued/Transferred/Disposed'],datasets:[{data:[totalRemaining,totalInventory-totalRemaining],backgroundColor:['#28a745','#dc3545']}]}});
+
+}
+
+/* ===== EXPORT ===== */
+function exportFullExcel(){
+    const wb=XLSX.utils.book_new();
+    function addSheet(name,data){ if(data.length){ const ws=XLSX.utils.json_to_sheet(data); XLSX.utils.book_append_sheet(wb,ws,name); } }
+    addSheet('Inventory',inventory);
+    addSheet('Issuance',issuance);
+    addSheet('Transfers',transfers);
+    addSheet('Repairs',repairs);
+    addSheet('Disposals',disposals);
+    XLSX.writeFile(wb,'PIMIS_Export.xlsx');
+}
+
+function exportFullPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    function addTable(title,data){
+        doc.text(title,10,doc.lastAutoTable?doc.lastAutoTable.finalY+10:10);
+        if(data.length) doc.autoTable({ startY:doc.lastAutoTable?doc.lastAutoTable.finalY+15:20, head:[Object.keys(data[0])], body:data.map(Object.values) });
+        else doc.text('No data available',10,doc.lastAutoTable?doc.lastAutoTable.finalY+15:20);
     }
+    addTable('Inventory',inventory);
+    addTable('Issuance',issuance);
+    addTable('Transfers',transfers);
+    addTable('Repairs',repairs);
+    addTable('Disposals',disposals);
+    doc.save('PIMIS_Export.pdf');
+}
 
-    function renderInventory(){
-        updateRemainingInventory();
-        let table="";
-        inventory.forEach((i,index)=>{
-            const total=i.qty*i.unitPrice;
-            table+=`<tr>
-                <td>${i.property}</td>
-                <td>${i.item}</td>
-                <td>${i.qty}</td>
-                <td>${i.remaining}</td>
-                <td>${i.unitPrice.toLocaleString()}</td>
-                <td>${total.toLocaleString()}</td>
-                <td>${i.officer}</td>
-                <td>${i.location}</td>
-                <td>${i.condition}</td>
-                <td><button onclick="deleteItem(${index})">Delete</button></td>
-            </tr>`;
-        });
-        document.querySelector("#inventoryTable tbody").innerHTML=table;
-    }
-
-    function deleteItem(index){ inventory.splice(index,1); localStorage.setItem('inventory',JSON.stringify(inventory)); renderInventory(); updateDashboard(); }
-
-    function renderIssuance(){
-        let t="";
-        issuance.forEach((i,index)=>{
-            t+=`<tr>
-                <td>${i.property}</td><td>${i.ics}</td><td>${i.par}</td><td>${i.to}</td>
-                <td><button onclick="printPAR(${index})">Print</button></td>
-            </tr>`;
-        });
-        document.querySelector("#issuanceTable tbody").innerHTML=t;
-    }
-
-    function renderTransfers(){ let t=""; transfers.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.from}</td><td>${i.to}</td></tr>`; }); document.querySelector("#transferTable tbody").innerHTML=t; }
-    function renderRepairs(){ let t=""; repairs.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.issue}</td><td>${parseFloat(i.cost).toLocaleString()}</td></tr>`; }); document.querySelector("#repairTable tbody").innerHTML=t; }
-    function renderDisposals(){ let t=""; disposals.forEach(i=>{ t+=`<tr><td>${i.property}</td><td>${i.method}</td></tr>`; }); document.querySelector("#disposalTable tbody").innerHTML=t; }
-
-    // ===== FORM SUBMISSION =====
-    document.getElementById("inventoryForm").addEventListener("submit", function(e){
-        e.preventDefault();
-        const item={ property:propertyNo.value, item:itemName.value, qty:parseInt(qty.value), unitPrice:parseFloat(unitPrice.value), officer:officer.value, location:itemLocation.value, condition:condition.value };
-        inventory.push(item); localStorage.setItem('inventory',JSON.stringify(inventory)); renderInventory(); updateDashboard(); this.reset();
-    });
-
-    document.getElementById("issuanceForm").addEventListener("submit", function(e){
-        e.preventDefault();
-        issuance.push({ property:issueProperty.value, ics:ics.value, par:par.value, to:issuedTo.value });
-        localStorage.setItem('issuance',JSON.stringify(issuance)); renderIssuance(); renderInventory(); updateDashboard(); this.reset();
-    });
-
-    document.getElementById("transferForm").addEventListener("submit", function(e){
-        e.preventDefault();
-        transfers.push({ property:transferProperty.value, from:fromOffice.value, to:toOffice.value });
-        localStorage.setItem('transfers',JSON.stringify(transfers)); renderTransfers(); renderInventory(); updateDashboard(); this.reset();
-    });
-
-    document.getElementById("repairForm").addEventListener("submit", function(e){
-        e.preventDefault();
-        repairs.push({ property:repairProperty.value, issue:issue.value, cost:parseFloat(cost.value) });
-        localStorage.setItem('repairs',JSON.stringify(repairs)); renderRepairs(); updateDashboard(); this.reset();
-    });
-
-    document.getElementById("disposalForm").addEventListener("submit", function(e){
-        e.preventDefault();
-        disposals.push({ property:disposeProperty.value, method:method.value });
-        localStorage.setItem('disposals',JSON.stringify(disposals)); renderDisposals(); renderInventory(); updateDashboard(); this.reset();
-    });
-
-    // ===== EXPORT =====
-    function exportFullExcel(){
-        const wb=XLSX.utils.book_new();
-        const inventoryData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(inventoryData),"Inventory");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(issuance),"Issuance");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(transfers),"Transfers");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(repairs),"Repairs");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(disposals),"Disposals");
-        XLSX.writeFile(wb,"PIMIS_Full_Report.xlsx");
-    }
-
-    function exportFullPDF(){
-        const { jsPDF }=window.jspdf;
-        const doc=new jsPDF();
-        let startY=20;
-        doc.setFontSize(14); doc.text("PIMIS Full Report",10,startY); startY+=10;
-
-        function addTable(title,data,headers){
-            doc.setFontSize(12); doc.text(title,10,startY); startY+=5;
-            if(!data.length){ doc.text("No data available",10,startY); startY+=10; return; }
-            const rows=data.map(obj=>headers.map(h=>['Unit Price','Total Value','Cost'].includes(h)? '₱'+(obj[h]?parseFloat(obj[h]).toLocaleString():0):obj[h]||'' ));
-            doc.autoTable({ head:[headers], body:rows, startY, margin:{left:10,right:10}, styles:{fontSize:10,cellPadding:2}, theme:'grid', headStyles:{fillColor:[0,123,255],textColor:255} });
-            startY=doc.lastAutoTable.finalY+10;
-        }
-
-        const invData=inventory.map(i=>({ Property:i.property, Item:i.item, Qty:i.qty, Remaining:i.remaining, 'Unit Price':i.unitPrice, 'Total Value':i.qty*i.unitPrice, Officer:i.officer, Location:i.location, Condition:i.condition }));
-        addTable("Inventory",invData,["Property","Item","Qty","Remaining","Unit Price","Total Value","Officer","Location","Condition"]);
-        addTable("Issuance",issuance,["property","ics","par","to"]);
-        addTable("Transfers",transfers,["property","from","to"]);
-        addTable("Repairs",repairs,["property","issue","cost"]);
-        addTable("Disposals",disposals,["property","method"]);
-
-        doc.save("PIMIS_Full_Report.pdf");
-    }
-
-    // ===== PRINT PAR =====
-    function printPAR(index){
-        const i=issuance[index];
-        const w=window.open('','Print','width=600,height=400');
-        w.document.write(`<h2>Property Acknowledgment Receipt (PAR)</h2><p>Property: ${i.property}</p><p>PAR: ${i.par}</p><p>Issued To: ${i.to}</p>`);
-        w.print();
-    }
-
-    // ===== DASHBOARD =====
-    function updateDashboard(){
-        updateRemainingInventory();
-        const ctxBar=document.getElementById('barChart').getContext('2d');
-        const ctxPie=document.getElementById('pieChart').getContext('2d');
-        const labels=inventory.map(i=>i.item);
-        const remainingData=inventory.map(i=>i.remaining);
-        const conditions={};
-        inventory.forEach(i=>conditions[i.condition]=(conditions[i.condition]||0)+1);
-
-        if(window.barChart) window.barChart.destroy();
-        if(window.pieChart) window.pieChart.destroy();
-
-        window.barChart=new Chart(ctxBar,{ type:'bar', data:{ labels, datasets:[{ label:'Remaining Qty', data:remainingData, backgroundColor:'#007bff' }] }, options:{ responsive:true } });
-        window.pieChart=new Chart(ctxPie,{ type:'pie', data:{ labels:Object.keys(conditions), datasets:[{ data:Object.values(conditions), backgroundColor:['#007bff','#28a745','#ffc107','#dc3545'] }] }, options:{ responsive:true } });
-    }
-
-    // ===== INITIAL RENDER =====
-    renderInventory(); renderIssuance(); renderTransfers(); renderRepairs(); renderDisposals(); updateDashboard();
+/* ===== INITIAL RENDER ===== */
+renderInventory(); renderIssuance(); renderTransfers(); renderRepairs(); renderDisposals();
 </script>
-
 </body>
 </html>
